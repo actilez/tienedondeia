@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Simon's Flashcards - Ciencia de lo Artificial</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos base y variables de color estilo "Clash" */
+        :root {
+            --primary-bg: #1a1c29;
+            --card-bg: #2d3142;
+            --accent-blue: #3b82f6;
+            --accent-gold: #fbbf24;
+            --text-light: #f3f4f6;
+            --text-muted: #9ca3af;
+        }
+
+        body {
+            background-color: var(--primary-bg);
+            color: var(--text-light);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Estilos para el efecto de volteo de tarjeta (Flip Card) */
+        .perspective-1000 {
+            perspective: 1000px;
+        }
+
+        .preserve-3d {
+            transform-style: preserve-3d;
+        }
+
+        .backface-hidden {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+
+        .rotate-y-180 {
+            transform: rotateY(180deg);
+        }
+
+        /* Transición suave para las tarjetas */
+        .card-inner {
+            transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
+            transform-style: preserve-3d;
+            display: grid; /* Usamos grid para que la tarjeta crezca dinámicamente */
+            width: 100%;
+            min-height: 420px; /* Aumentamos la altura mínima base para dar buen respiro */
+        }
+
+        .card.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+
+        /* Caras de la tarjeta */
+        .card-face {
+            grid-area: 1 / 1; /* Ambas caras comparten el mismo espacio en el grid */
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            border-radius: 1rem;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            height: 100%; /* La cara con menos texto se estirará para igualar a la más alta */
+        }
+
+        .card-front {
+            background: linear-gradient(145deg, #2d3142 0%, #1f2330 100%);
+            z-index: 2;
+        }
+
+        .card-back {
+            background: linear-gradient(145deg, #1e3a8a 0%, #1e40af 100%); /* Azul oscuro para el reverso */
+            transform: rotateY(180deg);
+            border-color: var(--accent-blue);
+        }
+
+        /* Detalles decorativos estilo carta */
+        .card-header-decor {
+            height: 40px;
+            background: rgba(0, 0, 0, 0.2);
+            border-top-left-radius: calc(1rem - 2px);
+            border-top-right-radius: calc(1rem - 2px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Animación de pulso para la indicación de tocar */
+        @keyframes pulse-soft {
+            0%, 100% { opacity: 0.6; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.05); }
+        }
+        .tap-indicator {
+            animation: pulse-soft 2s infinite;
+        }
+
+        /* --- NUEVOS ESTILOS PARA LA PORTADA ÉPICA --- */
+        .clash-title {
+            font-family: 'Arial Black', Impact, sans-serif;
+            text-transform: uppercase;
+            background: linear-gradient(to bottom, #ffffff 0%, #fde047 40%, #eab308 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            /* Doble sombra para crear el efecto 3D grueso estilo Clash */
+            filter: drop-shadow(0px 5px 0px #b45309) drop-shadow(0px 10px 10px rgba(0,0,0,0.8));
+            letter-spacing: 1px;
+            line-height: 1.1;
+        }
+        
+        .clash-button {
+            background: linear-gradient(to bottom, #60a5fa, #2563eb);
+            border: 2px solid #1e40af;
+            /* Sombra interna para el brillo superior y sombra externa para el grosor 3D */
+            box-shadow: inset 0 2px 0 rgba(255,255,255,0.4), 0 8px 0 #1e3a8a, 0 15px 15px rgba(0,0,0,0.5);
+            transition: all 0.1s;
+        }
+        .clash-button:active {
+            transform: translateY(8px);
+            box-shadow: inset 0 2px 0 rgba(255,255,255,0.4), 0 0 0 #1e3a8a, 0 5px 5px rgba(0,0,0,0.5);
+        }
+
+        .float-animation {
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-12px); }
+            100% { transform: translateY(0px); }
+        }
+        
+        .fade-out {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.6s ease-out;
+        }
+    </style>
+</head>
+<body class="antialiased pb-20">
+
+    <!-- PORTADA ÉPICA (PANTALLA DE INICIO) -->
+    <div id="cover-screen" class="fixed inset-0 z-[100] bg-[#1a1c29] flex flex-col items-center justify-center px-6 text-center overflow-hidden transition-opacity duration-500">
+        <!-- Fondo animado radial sutil -->
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-900/40 via-[#1a1c29] to-[#1a1c29]"></div>
+        
+        <div class="relative z-10 flex flex-col items-center justify-center min-h-[80vh] w-full max-w-md mx-auto">
+            
+            <!-- Escudo Épico Vectorial -->
+            <div class="relative float-animation mb-8">
+                <svg viewBox="0 0 100 120" class="w-36 h-36 sm:w-40 sm:h-40 drop-shadow-[0_15px_15px_rgba(0,0,0,0.8)]">
+                    <!-- Borde exterior dorado (madera/oro) -->
+                    <path d="M50 2 L95 20 L90 70 C85 100 50 118 50 118 C50 118 15 100 10 70 L5 20 Z" fill="#b45309" stroke="#fde047" stroke-width="2"/>
+                    <!-- Fondo interior azul del escudo -->
+                    <path d="M50 8 L88 24 L84 68 C80 94 50 110 50 110 C50 110 20 94 16 68 L12 24 Z" fill="url(#blue-grad)"/>
+                    <!-- Gema de la IA (Núcleo) en el centro -->
+                    <path d="M50 35 L70 50 L50 65 L30 50 Z" fill="#93c5fd" stroke="#fff" stroke-width="2"/>
+                    <path d="M50 65 L70 50 L50 85 L30 50 Z" fill="#3b82f6" stroke="#fff" stroke-width="2"/>
+                    <!-- Decoraciones metálicas laterales -->
+                    <circle cx="20" cy="30" r="3" fill="#fde047"/>
+                    <circle cx="80" cy="30" r="3" fill="#fde047"/>
+                    
+                    <defs>
+                        <linearGradient id="blue-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#3b82f6"/>
+                            <stop offset="100%" stop-color="#1e3a8a"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <!-- Resplandor mágico detrás del escudo -->
+                <div class="absolute inset-0 bg-blue-500/30 blur-2xl rounded-full mix-blend-screen -z-10 w-full h-full"></div>
+            </div>
+
+            <!-- Título Masivo 3D -->
+            <h1 class="clash-title text-5xl sm:text-6xl mb-6 font-black tracking-tight">
+                SIMON'S<br>
+                <span class="text-4xl sm:text-5xl">FLASHCARDS</span>
+            </h1>
+
+            <!-- Slogan Épico -->
+            <div class="bg-black/50 border-t-2 border-b-2 border-blue-500/40 py-4 px-6 mb-10 w-full shadow-[0_0_20px_rgba(0,0,0,0.5)]">
+                <p class="text-gray-200 font-medium text-[0.95rem] leading-relaxed">
+                    Domina la frontera entre lo natural y lo artificial.<br>
+                    <span class="text-yellow-400 font-bold block mt-2 text-base uppercase tracking-widest drop-shadow-md">¡Desata el poder de la interfaz!</span>
+                </p>
+            </div>
+
+            <!-- Botón de Entrada Interactiva -->
+            <button onclick="iniciarApp()" class="clash-button text-white font-bold text-xl px-10 py-4 rounded-xl uppercase tracking-wider relative group overflow-hidden w-full max-w-[280px]">
+                <span class="relative z-10 drop-shadow-md">Entrar a la Arena</span>
+                <!-- Animación de brillo al pasar el hover -->
+                <div class="absolute inset-0 h-full w-full bg-white/20 transform -skew-x-12 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]"></div>
+            </button>
+        </div>
+
+        <!-- Créditos en la portada -->
+        <div class="absolute bottom-6 text-gray-400 text-xs tracking-wide">
+            Trabajo presentado por <span class="text-yellow-400 font-bold">Jei García Martinez</span>
+        </div>
+        
+        <style>
+            @keyframes shimmer {
+                100% { transform: translateX(100%); }
+            }
+        </style>
+    </div>
+
+    <!-- Contenedor de la App Principal (Oculto al inicio) -->
+    <div id="app-container" class="hidden opacity-0 transition-opacity duration-700">
+
+    <!-- Encabezado fijo -->
+    <header class="fixed top-0 w-full z-50 bg-[#1a1c29]/90 backdrop-blur-md border-b border-gray-800 p-4">
+        <div class="flex items-center justify-between max-w-md mx-auto">
+            <div>
+                <h1 class="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">
+                    Simon's Flashcards
+                </h1>
+                <p class="text-xs text-gray-400">Ciencias de lo Artificial</p>
+            </div>
+            <div class="flex gap-2">
+                <!-- Iconos decorativos -->
+                <div class="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold shadow-[0_0_10px_rgba(37,99,235,0.5)]">IA</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Contenedor Principal -->
+    <main class="pt-24 px-4 max-w-md mx-auto">
+
+        <!-- Intro Text -->
+        <div class="mb-8 px-2">
+            <div class="bg-gray-800/50 p-5 sm:p-6 rounded-xl border border-gray-700 shadow-lg text-left relative overflow-hidden">
+                <!-- Brillo de fondo -->
+                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-yellow-500 opacity-70"></div>
+                
+                <h3 class="text-blue-400 font-bold text-lg mb-3 text-center flex justify-center items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                    La mejor interfaz: IA generativa
+                </h3>
+                
+                <p class="text-[0.9rem] text-gray-300 leading-relaxed mb-3">
+                    Herbert Simon y sus <em>Ciencias de lo Artificial</em> serán la excusa perfecta para hablar sobre <strong>qué tiene la IA y dónde opera</strong>. Hemos (Gemini y yo) tomado prestada la interfaz gráfica del juego <em>Clash Royale</em> para darle un giro llamativo a las clásicas flashcards, usando estas cartas como campo de batalla para explicar sus conceptos principales.
+                </p>
+
+                <p class="text-[0.9rem] text-gray-300 leading-relaxed mb-3">
+                    <strong class="text-blue-300">La IA Generativa es la ciencia más cercana para adaptarse a los fenómenos del ser humano.</strong> Según Simon, todo sistema artificial es un punto de encuentro o "interfaz" entre dos mundos. El <strong>entorno interno</strong> es "la sustancia y organización del artefacto en sí mismo", mientras que el <strong>entorno externo</strong> son "las condiciones en las que opera el artefacto" (Simon, 1996, p. 6).
+                </p>
+
+                <p class="text-[0.9rem] text-gray-300 leading-relaxed mb-4">
+                    El diseño exitoso logra que lo interno se adapte a lo externo para cumplir un propósito específico.
+                </p>
+
+                <p class="text-[0.9rem] text-gray-300 leading-relaxed mb-4">
+                    Por su parte, el físico Richard Feynman abordaba los fenómenos complejos de forma sorprendentemente alineada con esta visión. Feynman desarmaba la realidad en sus bloques fundamentales para explicarla, un método que resuena con la "arquitectura jerárquica" de Simon. Para Feynman, entender no era solo observar lo natural, sino ser capaz de "diseñarlo" o reconstruirlo mentalmente (lo interno) para predecir su comportamiento (lo externo). Esta filosofía de desmitificar la complejidad culminó en la famosa máxima que dejó escrita en su pizarra: <em>"Lo que no puedo crear, no lo entiendo"</em>.
+                </p>
+                
+                <!-- Citas APA 7 -->
+                <div class="text-[0.75rem] text-gray-400 mb-4 border-b border-gray-600 pb-4 italic space-y-1">
+                    <p>Referencia: Simon, H. A. (1996). <em>The sciences of the artificial</em> (3rd ed.). MIT Press.</p>
+                    <p>Referencia: Feynman, R. P. (1988). <em>Feynman's blackboard at time of his death</em> [Fotografía de archivo]. California Institute of Technology Archives.</p>
+                </div>
+
+                <!-- Autor del Trabajo -->
+                <div class="text-[0.85rem] text-blue-300 text-center mb-5 font-medium bg-blue-900/20 py-2 rounded border border-blue-800/50 shadow-sm">
+                    Trabajo presentado por: <span class="text-white font-bold">Jei García Martinez</span>
+                </div>
+
+                <!-- Regla de Batalla (Resumen) -->
+                <div class="text-center mt-2">
+                    <span class="text-white font-bold text-base block mb-3 drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">
+                        ⚔️ Reglas de Batalla ⚔️
+                    </span>
+                    <p class="text-[0.95rem] text-gray-200 leading-relaxed mb-4 bg-gray-900/50 p-3 rounded-lg border border-gray-700/50">
+                        <span class="text-purple-400 font-bold">Interno:</span> Qué tiene la IA (Diseño).<br>
+                        <span class="text-yellow-400 font-bold">Externo:</span> Dónde actúa la IA (Necesidad).
+                    </p>
+                    <span class="block text-sm font-medium text-white bg-blue-600/30 py-2.5 rounded-lg border border-blue-500/40 animate-[pulse-soft_2s_infinite]">
+                        ¡Toca las cartas para ver los ejemplos! ↺
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Unidad 1: La Interfaz -->
+        <section class="mb-10">
+            <h2 class="text-lg font-bold mb-4 flex items-center text-gray-100 pl-2">
+                <span class="w-2 h-6 bg-blue-500 rounded-full mr-3 shadow-[0_0_8px_rgba(59,130,246,0.6)]"></span>
+                Capítulo 1: La Interfaz
+            </h2>
+            
+            <div class="perspective-1000 w-full mb-4 px-1">
+                <div class="card cursor-pointer w-full" onclick="this.classList.toggle('flipped')">
+                    <div class="card-inner">
+                        <!-- Frente (Concepto) -->
+                        <div class="card-face card-front p-0 flex flex-col relative overflow-hidden">
+                            <!-- Brillo decorativo superior -->
+                            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-50"></div>
+                            
+                            <div class="p-6 sm:p-8 flex-grow flex flex-col justify-center items-center text-center">
+                                <div class="w-16 h-16 rounded-full bg-blue-900/50 flex items-center justify-center mb-5 border border-blue-500/30">
+                                    <svg class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                                </div>
+                                <h3 class="text-xl font-bold text-blue-300 mb-3">El Artefacto como Interfaz</h3>
+                                <p class="text-[0.95rem] text-gray-300 leading-relaxed">
+                                    El artefacto (IA) es un <span class="text-white font-semibold">punto de encuentro</span>. Es una herramienta diseñada por humanos (<span class="text-purple-400">Interno</span>) para encajar perfectamente en un entorno y resolver una necesidad (<span class="text-yellow-400">Externo</span>).
+                                </p>
+                            </div>
+                            <div class="card-header-decor text-xs text-gray-400 tap-indicator">
+                                Toca para ver el ataque (Ejemplo) ↺
+                            </div>
+                        </div>
+
+                        <!-- Reverso (Ejemplo) -->
+                        <div class="card-face card-back p-0 flex flex-col justify-center">
+                            <div class="p-6 sm:p-8 text-center">
+                                <h4 class="text-yellow-400 font-bold mb-4 uppercase text-sm tracking-wider">Ataque en el Campo</h4>
+                                <div class="text-5xl mb-5 drop-shadow-lg">🗺️</div>
+                                <h3 class="text-lg font-bold text-white mb-3">Sistema GPS</h3>
+                                <div class="bg-black/30 rounded-xl p-5 text-[0.95rem] text-left space-y-3 leading-relaxed shadow-inner border border-white/5">
+                                    <p><span class="text-purple-300 font-bold">Interno (Qué tiene):</span> Algoritmos de cálculo de rutas, mapas digitales, diseño de interfaz.</p>
+                                    <p><span class="text-yellow-300 font-bold">Externo (Dónde actúa):</span> Tu necesidad urgente de llegar al trabajo en una ciudad con tráfico cambiante.</p>
+                                    <p class="text-white text-sm mt-4 text-center italic opacity-90">"La IA adapta el satélite a tu prisa."</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Unidad 2: Satisficing -->
+        <section class="mb-10">
+            <h2 class="text-lg font-bold mb-4 flex items-center text-gray-100 pl-2">
+                <span class="w-2 h-6 bg-green-500 rounded-full mr-3 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
+                Capítulo 2: Racionalidad Limitada
+            </h2>
+            
+            <div class="perspective-1000 w-full mb-4 px-1">
+                <div class="card cursor-pointer w-full" onclick="this.classList.toggle('flipped')">
+                    <div class="card-inner">
+                        <!-- Frente (Concepto) -->
+                        <div class="card-face card-front p-0 flex flex-col relative overflow-hidden">
+                             <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-green-500 to-transparent opacity-50"></div>
+                             
+                            <div class="p-6 sm:p-8 flex-grow flex flex-col justify-center items-center text-center">
+                                <div class="w-16 h-16 rounded-full bg-green-900/50 flex items-center justify-center mb-5 border border-green-500/30">
+                                    <svg class="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                </div>
+                                <h3 class="text-xl font-bold text-green-300 mb-3">"Satisficing" (Satisfacer)</h3>
+                                <p class="text-[0.95rem] text-gray-300 leading-relaxed">
+                                    La IA no busca la perfección absoluta (optimizar); usa lo que tiene (<span class="text-purple-400">Interno</span>) para dar una respuesta <span class="text-white font-semibold">"suficientemente buena"</span> para la situación requerida (<span class="text-yellow-400">Externo</span>).
+                                </p>
+                            </div>
+                            <div class="card-header-decor text-xs text-gray-400 tap-indicator">
+                                Toca para ver el ataque (Ejemplo) ↺
+                            </div>
+                        </div>
+
+                        <!-- Reverso (Ejemplo) -->
+                        <div class="card-face card-back p-0 flex flex-col justify-center" style="background: linear-gradient(145deg, #064e3b 0%, #065f46 100%); border-color: #10b981;">
+                            <div class="p-6 sm:p-8 text-center">
+                                <h4 class="text-yellow-400 font-bold mb-4 uppercase text-sm tracking-wider">Ataque en el Campo</h4>
+                                <div class="text-5xl mb-5 drop-shadow-lg">⌨️</div>
+                                <h3 class="text-lg font-bold text-white mb-3">Autocompletar / Corrector</h3>
+                                <div class="bg-black/30 rounded-xl p-5 text-[0.95rem] text-left space-y-3 leading-relaxed shadow-inner border border-white/5">
+                                    <p><span class="text-purple-300 font-bold">Interno (Qué tiene):</span> Modelos estadísticos de lenguaje entrenados por humanos.</p>
+                                    <p><span class="text-yellow-300 font-bold">Externo (Dónde actúa):</span> Estás escribiendo un chat rápido caminando por la calle.</p>
+                                    <p class="text-white text-sm mt-4 text-center italic opacity-90">"No analiza toda la gramática, predice la palabra útil para que sigas."</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Unidad 3: Arquitectura Jerárquica -->
+        <section class="mb-10">
+            <h2 class="text-lg font-bold mb-4 flex items-center text-gray-100 pl-2">
+                <span class="w-2 h-6 bg-purple-500 rounded-full mr-3 shadow-[0_0_8px_rgba(168,85,247,0.6)]"></span>
+                Capítulo 3: Complejidad
+            </h2>
+            
+            <div class="perspective-1000 w-full mb-4 px-1">
+                <div class="card cursor-pointer w-full" onclick="this.classList.toggle('flipped')">
+                    <div class="card-inner">
+                        <!-- Frente (Concepto) -->
+                        <div class="card-face card-front p-0 flex flex-col relative overflow-hidden">
+                             <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-50"></div>
+                             
+                            <div class="p-6 sm:p-8 flex-grow flex flex-col justify-center items-center text-center">
+                                <div class="w-16 h-16 rounded-full bg-purple-900/50 flex items-center justify-center mb-5 border border-purple-500/30">
+                                    <svg class="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                                </div>
+                                <h3 class="text-xl font-bold text-purple-300 mb-3">Estructura Jerárquica</h3>
+                                <p class="text-[0.95rem] text-gray-300 leading-relaxed">
+                                    Los sistemas complejos exitosos son "cuasi-descomponibles". Lo diseñado (<span class="text-purple-400">Interno</span>) se divide en bloques. Si una parte del entorno (<span class="text-yellow-400">Externo</span>) cambia o falla, el sistema entero no colapsa.
+                                </p>
+                            </div>
+                            <div class="card-header-decor text-xs text-gray-400 tap-indicator">
+                                Toca para ver el ataque (Ejemplo) ↺
+                            </div>
+                        </div>
+
+                        <!-- Reverso (Ejemplo) -->
+                        <div class="card-face card-back p-0 flex flex-col justify-center" style="background: linear-gradient(145deg, #4c1d95 0%, #5b21b6 100%); border-color: #8b5cf6;">
+                            <div class="p-6 sm:p-8 text-center">
+                                <h4 class="text-yellow-400 font-bold mb-4 uppercase text-sm tracking-wider">Ataque en el Campo</h4>
+                                <div class="text-5xl mb-5 drop-shadow-lg">👁️</div>
+                                <h3 class="text-lg font-bold text-white mb-3">Reconocimiento Facial</h3>
+                                <div class="bg-black/30 rounded-xl p-5 text-[0.95rem] text-left space-y-3 leading-relaxed shadow-inner border border-white/5">
+                                    <p><span class="text-purple-300 font-bold">Interno (Qué tiene):</span> Redes neuronales en capas (una detecta bordes, otra formas, otra rostros).</p>
+                                    <p><span class="text-yellow-300 font-bold">Externo (Dónde actúa):</span> Intentas desbloquear el teléfono de noche (poca luz).</p>
+                                    <p class="text-white text-sm mt-4 text-center italic opacity-90">"Si falla la detección de color por oscuridad, la capa de formas aún te reconoce."</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Unidad 4: Diseño y Símbolos -->
+        <section class="mb-10">
+            <h2 class="text-lg font-bold mb-4 flex items-center text-gray-100 pl-2">
+                <span class="w-2 h-6 bg-red-500 rounded-full mr-3 shadow-[0_0_8px_rgba(239,68,68,0.6)]"></span>
+                Capítulo 4: Ciencia del Diseño
+            </h2>
+            
+            <div class="perspective-1000 w-full mb-4 px-1">
+                <div class="card cursor-pointer w-full" onclick="this.classList.toggle('flipped')">
+                    <div class="card-inner">
+                        <!-- Frente (Concepto) -->
+                        <div class="card-face card-front p-0 flex flex-col relative overflow-hidden">
+                             <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent opacity-50"></div>
+                             
+                            <div class="p-6 sm:p-8 flex-grow flex flex-col justify-center items-center text-center">
+                                <div class="w-16 h-16 rounded-full bg-red-900/50 flex items-center justify-center mb-5 border border-red-500/30">
+                                    <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                                </div>
+                                <h3 class="text-xl font-bold text-red-300 mb-3">Procesamiento de Símbolos</h3>
+                                <p class="text-[0.95rem] text-gray-300 leading-relaxed">
+                                    La IA no "piensa" biológicamente. Manipula símbolos y reglas (<span class="text-purple-400">Interno</span>) para imitar comportamientos y resolver problemas en el mundo real (<span class="text-yellow-400">Externo</span>). El diseño es el arte de organizar esos símbolos.
+                                </p>
+                            </div>
+                            <div class="card-header-decor text-xs text-gray-400 tap-indicator">
+                                Toca para ver el ataque (Ejemplo) ↺
+                            </div>
+                        </div>
+
+                        <!-- Reverso (Ejemplo) -->
+                        <div class="card-face card-back p-0 flex flex-col justify-center" style="background: linear-gradient(145deg, #7f1d1d 0%, #991b1b 100%); border-color: #ef4444;">
+                            <div class="p-6 sm:p-8 text-center">
+                                <h4 class="text-yellow-400 font-bold mb-4 uppercase text-sm tracking-wider">Ataque en el Campo</h4>
+                                <div class="text-5xl mb-5 drop-shadow-lg">🤖</div>
+                                <h3 class="text-lg font-bold text-white mb-3">ChatGPT (LLMs)</h3>
+                                <div class="bg-black/30 rounded-xl p-5 text-[0.95rem] text-left space-y-3 leading-relaxed shadow-inner border border-white/5">
+                                    <p><span class="text-purple-300 font-bold">Interno (Qué tiene):</span> Tokens, pesos matemáticos y predicción de la siguiente palabra.</p>
+                                    <p><span class="text-yellow-300 font-bold">Externo (Dónde actúa):</span> Un estudiante necesita que le expliquen un texto denso.</p>
+                                    <p class="text-white text-sm mt-4 text-center italic opacity-90">"Procesa números (símbolos) para que en tu pantalla parezca un profesor."</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Carta Legendaria (Feynman) -->
+        <section class="mb-12">
+            <h2 class="text-lg font-bold mb-4 flex items-center text-yellow-400 pl-2">
+                <span class="text-xl mr-3 drop-shadow-[0_0_8px_rgba(250,204,21,0.8)]">⭐</span>
+                Carta Legendaria
+            </h2>
+            
+            <div class="perspective-1000 w-full mb-4 px-1">
+                <div class="card cursor-pointer w-full" onclick="this.classList.toggle('flipped')">
+                    <div class="card-inner">
+                        <!-- Frente (Concepto) -->
+                        <div class="card-face card-front p-0 flex flex-col relative overflow-hidden border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.3)]">
+                             <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-yellow-400 to-transparent"></div>
+                             
+                            <div class="p-6 sm:p-8 flex-grow flex flex-col justify-center items-center text-center">
+                                <div class="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-600 flex items-center justify-center mb-5 text-white font-bold text-2xl border-2 border-yellow-200 shadow-[0_0_15px_rgba(251,191,36,0.5)]">
+                                    F
+                                </div>
+                                <h3 class="text-xl font-bold text-yellow-400 mb-3">El Filtro de Feynman</h3>
+                                <p class="text-[0.95rem] text-gray-300 leading-relaxed">
+                                    <span class="italic text-yellow-200">"Lo que no puedo crear, no lo entiendo."</span><br><br>
+                                    La capacidad suprema de reducir la complejidad técnica pura (<span class="text-purple-400">Interno</span>) a una explicación que cualquiera pueda comprender y aplicar (<span class="text-yellow-400">Externo</span>).
+                                </p>
+                            </div>
+                            <div class="card-header-decor text-xs text-yellow-400 tap-indicator bg-yellow-900/30">
+                                ¡Toca para ver el poder Legendario! ↺
+                            </div>
+                        </div>
+
+                        <!-- Reverso (Ejemplo) -->
+                        <div class="card-face card-back p-0 flex flex-col justify-center" style="background: linear-gradient(145deg, #78350f 0%, #92400e 100%); border-color: #fbbf24; box-shadow: 0 0 20px rgba(251,191,36,0.5);">
+                            <div class="p-6 sm:p-8 text-center">
+                                <h4 class="text-yellow-200 font-bold mb-4 uppercase text-sm tracking-wider">Ataque Legendario</h4>
+                                <div class="text-5xl mb-5 drop-shadow-lg">🪄</div>
+                                <h3 class="text-lg font-bold text-white mb-3">Explicar la IA</h3>
+                                <div class="bg-black/40 rounded-xl p-5 text-[0.95rem] text-left space-y-4 leading-relaxed border border-yellow-500/30 shadow-inner">
+                                    <p><span class="text-yellow-400 font-bold block mb-1">La Magia:</span> No expliques el "Gradient Descent" (matemática interna).</p>
+                                    <p><span class="text-white font-bold block mb-1">El Resultado:</span> Explica que la IA es como un estudiante ciego bajando una montaña, que da pasos pequeños tanteando el suelo hasta llegar al fondo (menor error).</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Barra de navegación inferior -->
+    <nav class="fixed bottom-0 w-full bg-[#1a1c29]/95 backdrop-blur-lg border-t border-gray-800 p-3 z-50">
+        <div class="flex justify-around max-w-md mx-auto text-xs">
+            <button class="flex flex-col items-center text-blue-400 font-bold">
+                <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                Mazo
+            </button>
+            <button class="flex flex-col items-center text-gray-500 hover:text-gray-300" onclick="alert('En un futuro aquí podrías ver estadísticas de estudio.')">
+                <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                Progreso
+            </button>
+        </div>
+    </nav>
+
+    </div> <!-- Fin del contenedor de la App Principal -->
+
+    <script>
+        // Lógica de transición: Quitar portada y mostrar las Flashcards
+        function iniciarApp() {
+            const cover = document.getElementById('cover-screen');
+            const app = document.getElementById('app-container');
+            
+            // 1. Iniciar efecto de desvanecimiento para la portada
+            cover.classList.add('fade-out');
+            
+            // 2. Mostrar la app en el DOM (pero sigue transparente)
+            app.classList.remove('hidden');
+            
+            // 3. Pequeño retraso para permitir que el CSS renderice y aplique la opacidad suave
+            setTimeout(() => {
+                app.classList.remove('opacity-0');
+            }, 50);
+
+            // 4. Eliminar completamente la portada para que no bloquee clics
+            setTimeout(() => {
+                cover.style.display = 'none';
+                window.scrollTo(0, 0); // Asegurar que inicie arriba
+            }, 600);
+        }
+    </script>
+</body>
+</html>
